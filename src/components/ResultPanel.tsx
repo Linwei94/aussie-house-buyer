@@ -272,7 +272,7 @@ function BreakevenSection({
           ? { color: 'text-amber-600', label: '接近悉尼公寓历史均线，需选好区' }
           : { color: 'text-red-600', label: '高于历史均线，挑战较大' }
 
-  // 敏感性：ETF 改成 5% / 9% 时，盈亏平衡卖价会怎么变
+  // 敏感性：个人投资回报改成 ±2pp 时，盈亏平衡卖价会怎么变
   const sensitivity = useMemo(() => {
     const lo = calculateAll({ ...inputs, etfReturnPct: Math.max(2, etfRate - 2) })
     const hi = calculateAll({ ...inputs, etfReturnPct: etfRate + 2 })
@@ -293,7 +293,7 @@ function BreakevenSection({
     <Card>
       <CardHeader>
         <CardTitle className="text-sm">
-          {result.scenarioYears} 年后买房 vs 租房+ETF：要赚钱房价需涨多少
+          {result.scenarioYears} 年后买房 vs 租房+个人投资：要赚钱房价需涨多少
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -323,7 +323,7 @@ function BreakevenSection({
           </p>
           <div className="grid grid-cols-3 gap-2">
             <InlineNumberField
-              label="ETF 年化"
+              label="个人投资 年化"
               suffix="%"
               value={etfRate}
               onChange={(v) => update({ etfReturnPct: v })}
@@ -349,7 +349,7 @@ function BreakevenSection({
             />
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">
-            💡 ETF 假设的敏感性：
+            💡 个人投资回报的敏感性：
             {sensitivity.loRate}% → 平衡 {formatCurrency(sensitivity.loPrice)}（涨 {formatPercent(sensitivity.loGrowth, 2)}）；
             {sensitivity.hiRate}% → 平衡 {formatCurrency(sensitivity.hiPrice)}（涨 {formatPercent(sensitivity.hiGrowth, 2)}）
           </p>
@@ -399,7 +399,7 @@ function FormulaVisualization({
       {open && (
         <div className="mt-3 space-y-3 rounded-md bg-slate-50 p-3 font-mono text-[11px] leading-relaxed">
           <FormulaBlock
-            title={`① 租房+ETF ${N} 年后总资产`}
+            title={`① 租房+个人投资 ${N} 年后总资产`}
             colored="text-blue-700"
           >
             <FormulaLine>初始本金 = 入场现金 + Offset 初始</FormulaLine>
@@ -410,7 +410,7 @@ function FormulaVisualization({
               <strong>{formatCurrency(be.rentPathInitial)}</strong>
             </FormulaLine>
             <FormulaLine>
-              每期 ETF 复利率 = (1 + {etfRate}%)^(1/{be.periodsPerYear}) − 1
+              每期复利率 = (1 + {etfRate}%)^(1/{be.periodsPerYear}) − 1
             </FormulaLine>
             <FormulaLine>
               每期投入 = ({cadence}买房支出 + offset 月增入) − {cadence}租金
@@ -589,7 +589,7 @@ function ComparisonChart({ result }: { result: CalculationResult }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">买房 vs 租房 + ETF（资产对比）</CardTitle>
+        <CardTitle className="text-sm">买房 vs 租房 + 个人投资（资产对比）</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-72 w-full">
@@ -633,7 +633,7 @@ function ComparisonChart({ result }: { result: CalculationResult }) {
           </ResponsiveContainer>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          房价按假设的年涨幅复利；租房路径用 ETF 复利计入入场现金 + 每月差额。
+          房价按假设的年涨幅复利；租房路径按个人投资年化回报复利计入入场现金 + 每月差额。
         </p>
       </CardContent>
     </Card>

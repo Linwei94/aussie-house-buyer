@@ -24,7 +24,7 @@ export interface Inputs {
   interestRateCurve?: number[] // 持有期间利率曲线（数组长 = holdYears+1，表示年初利率）。优先级高于 interestRate
   loanTermYears?: number // 默认 30
   rentNowPerWeek?: number // "如果租房" 起步周租，默认 700
-  rentFrequency?: 'monthly' | 'fortnightly' // 租房 + ETF 节奏，默认 fortnightly
+  rentFrequency?: 'monthly' | 'fortnightly' // 租房 + 个人投资节奏，默认 fortnightly
   rentGrowthPct?: number // 默认 3
   etfReturnPct?: number // 默认 7
   appreciationPct?: number // 默认 4
@@ -369,7 +369,7 @@ export interface BreakevenResult {
   totalInterestPaid: number
   totalInterestNoOffset: number // 不用 offset 的对照
   rentPathInitial: number // 入场现金 + offset 初始
-  rentPathContributions: number // 累积投入 ETF 的差额（不含初始）
+  rentPathContributions: number // 累积投入个人投资的差额（不含初始）
   periodsPerYear: number // 26 if fortnightly else 12
   commissionFraction: number
 }
@@ -397,7 +397,7 @@ export function calculateAll(inputs: Inputs): CalculationResult {
     inputs.interestRate ?? defaultInterestRate(purpose, depositPct)
   const loanTerm = inputs.loanTermYears ?? 30
   const rentGrowth = (inputs.rentGrowthPct ?? 3) / 100
-  // ETF 默认 = 贷款利率（用户假设：自己投资回报 ≈ 银行贷款利率）
+  // 个人投资 默认 = 贷款利率（用户假设：自己投资回报 ≈ 银行贷款利率）
   const etfReturn = (inputs.etfReturnPct ?? baseRate) / 100
   const appreciation =
     (propertyData?.suburbAppreciation ?? inputs.appreciationPct ?? 4) / 100
@@ -530,7 +530,7 @@ export function calculateAll(inputs: Inputs): CalculationResult {
   const finalOffsetBalance = buyAtHold.offsetBalance
 
   // 租房路径资产（fortnightly 或 monthly 节奏）
-  // 公平对比：买家月度真实支出（mortgage + holding + offset月增）-> 租家投入 ETF
+  // 公平对比：买家月度真实支出（mortgage + holding + offset月增）-> 租家投入个人投资
   const rentNowPerWeek = inputs.rentNowPerWeek ?? 700
   const periodETF = Math.pow(1 + etfReturn, 1 / periodsPerYear) - 1
   const annualRent0 = rentNowPerWeek * 52

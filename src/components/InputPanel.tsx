@@ -413,7 +413,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
         {/* ──── 高级假设 ──── */}
         <CollapsibleSection
           title="高级假设"
-          subtitle="（利率、租金、ETF）"
+          subtitle="（利率、租金、个人投资）"
           open={openAdvanced}
           onToggle={() => setOpenAdvanced(!openAdvanced)}
         >
@@ -461,7 +461,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
               step={0.5}
             />
             <NumberOverrideField
-              label="ETF/投资 年化回报"
+              label="个人投资 年化回报"
               suffix="%"
               defaultValue={inputs.interestRate ?? defaultRate}
               value={inputs.etfReturnPct}
@@ -503,7 +503,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
                 </Button>
               </div>
               <p className="text-[10px] text-muted-foreground">
-                影响 ETF 复利节奏（每两周 = 26 期/年，更贴合实际现金流）
+                影响个人投资复利节奏（每两周 = 26 期/年，更贴合实际现金流）
               </p>
             </div>
 
@@ -532,7 +532,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
               </div>
               <p className="mt-1.5 text-[10px] leading-tight text-blue-900/70">
                 Offset 账户里的钱抵消等额贷款利息。$50K 在 offset = 月省利息 $250（@5.99%）。
-                公平对比：租房路径会把同样的钱投 ETF。
+                公平对比：租房路径会把同样的钱投到个人投资里。
               </p>
             </div>
           </div>
