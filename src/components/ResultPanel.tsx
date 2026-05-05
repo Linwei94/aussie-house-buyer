@@ -398,6 +398,39 @@ function FormulaVisualization({
       </button>
       {open && (
         <div className="mt-3 space-y-3 rounded-md bg-slate-50 p-3 font-mono text-[11px] leading-relaxed">
+          {be.investmentYears > 0 && (
+            <FormulaBlock
+              title={`⓪ 转投资房效应（投资期 ${be.investmentYears} 年）`}
+              colored="text-purple-700"
+            >
+              <FormulaLine>
+                累计净到手租金（扣 mgmt + 空置）={' '}
+                <strong>{formatCurrency(be.totalRentReceived)}</strong>
+              </FormulaLine>
+              <FormulaLine>
+                累计税务节省（负扣税 × 边际税率 {(inputs.marginalTaxRate ?? 32)}
+                %）={' '}
+                <strong className="text-purple-700">
+                  {be.totalTaxBenefit >= 0 ? '+' : ''}
+                  {formatCurrency(be.totalTaxBenefit)}
+                </strong>
+              </FormulaLine>
+              <FormulaLine>
+                月均净流入 ={' '}
+                <strong>
+                  {formatCurrency(
+                    (be.totalRentReceived + be.totalTaxBenefit) /
+                      (be.investmentYears * 12),
+                  )}
+                </strong>
+                /月（投资期）
+              </FormulaLine>
+              <FormulaLine className="border-t pt-1 text-[10px]">
+                这些净流入抵冲月度支出；多余部分进 offset。租金每年按租金涨幅复利。
+              </FormulaLine>
+            </FormulaBlock>
+          )}
+
           <FormulaBlock
             title={`① 租房+个人投资 ${N} 年后总资产`}
             colored="text-blue-700"

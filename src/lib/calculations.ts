@@ -31,6 +31,12 @@ export interface Inputs {
   // Offset 账户
   offsetInitial?: number // 初始 offset 余额（$），默认 0
   offsetMonthly?: number // 每月新增 offset（$），默认 0
+  // 转投资房 + 负扣税（可选）
+  convertToInvestmentYear?: number // 第几年转投资房（0 表示从一开始就是投资）；undefined / 999 = 永远自住
+  marginalTaxRate?: number // 边际税率 %，默认 32（$135K-$190K 段）
+  annualDepreciation?: number // 年度折旧 $，默认 4000（老公寓）
+  propMgmtPct?: number // 物业管理 % of rent，默认 7
+  vacancyRate?: number // 空置率 %，默认 4（约 2 周/年）
   // 具体房产数据 override（手动；未来 agent 自动填）
   propertyData?: PropertyData
   // 买卖费用 override
@@ -374,6 +380,9 @@ export interface BreakevenResult {
   commissionFraction: number
   annualPayments: number[] // 每年 P&I 月供（含 offset 重算后）
   effectiveLoanFinal: number // 最终有效贷款 = loan − offset
+  totalRentReceived: number // 投资期累计净到手租金
+  totalTaxBenefit: number // 投资期累计税务节省（正 = 退税；负 = 应付）
+  investmentYears: number // 投资期年数
 }
 
 export interface YearlyComparisonPoint {
@@ -459,6 +468,21 @@ export function calculateAll(inputs: Inputs): CalculationResult {
   const rentFrequency = inputs.rentFrequency ?? 'fortnightly'
   const periodsPerYear = rentFrequency === 'fortnightly' ? 26 : 12
 
+  // 转投资房参数
+  const convertYear =
+    inputs.convertToInvestmentYear !== undefined &&
+    inputs.convertToInvestmentYear !== null
+      ? inputs.convertToInvestmentYear
+      : 999 // 永远自住
+  const marginalTax = (inputs.marginalTaxRate ?? 32) / 100
+  const annualDepreciation = inputs.annualDepreciation ?? 4000
+  const propMgmtPct = (inputs.propMgmtPct ?? 7) / 100
+  const vacancyRate = (inputs.vacancyRate ?? 4) / 100
+  const isInvestmentYear = (yearIdx: number) => yearIdx >= convertYear
+  // 投资期收到的租金（property rent，不同于 rentNowPerWeek 即买家自己当租客时付的）
+  const propertyRentPerWeek =
+    propertyData?.rentPerWeek ?? estimateWeeklyRent(price, propertyData)
+
   // 买房路径：含 offset + 可变利率 的月度摊销（Model B: P&I 按"有效贷款"重算）
   // 关键逻辑：
   //   ① 利率按年取自曲线（rateAtYear）
@@ -474,6 +498,8 @@ export function calculateAll(inputs: Inputs): CalculationResult {
     let loanBalNo = loan
     let totalInterest = 0
     let totalInterestNo = 0
+    let totalRentReceived = 0
+    let totalTaxBenefit = 0 // 正 = 累积退税；负 = 累积应付税
     // 初始 P&I 按 effLoan 计算
     const effLoan0 = Math.max(0, loanBal - offsetBal)
     let currentPayment =
@@ -521,6 +547,37 @@ export function calculateAll(inputs: Inputs): CalculationResult {
       // 月末追加 offset 存款
       offsetBal += offsetMonthly
       monthCashOut += offsetMonthly
+
+      // ── 转投资房 phase：负扣税 + 租金收入 ──
+      let monthRentReceived = 0
+      let monthTaxEffect = 0
+      if (isInvestmentYear(yearIdx)) {
+        // 租金按 rentGrowth 复利从 yearIdx 开始
+        const adjustedWeeklyRent =
+          propertyRentPerWeek * Math.pow(1 + rentGrowth, yearIdx)
+        const monthlyEffectiveRent =
+          (adjustedWeeklyRent * 52 * (1 - vacancyRate)) / 12
+        const monthlyMgmtFee = monthlyEffectiveRent * propMgmtPct
+        monthRentReceived = monthlyEffectiveRent - monthlyMgmtFee // 净到手
+        // 税务：可抵扣 = 利息 + 持有 + 管理 + 折旧
+        const monthlyDeductible =
+          interest +
+          monthlyHolding +
+          monthlyMgmtFee +
+          annualDepreciation / 12
+        const monthlyTaxableRental = monthlyEffectiveRent - monthlyDeductible
+        monthTaxEffect = -monthlyTaxableRental * marginalTax // 正 = 退税；负 = 应付
+        totalRentReceived += monthRentReceived
+        totalTaxBenefit += monthTaxEffect
+        // 净流入（可能为负）
+        const monthlyInflow = monthRentReceived + monthTaxEffect
+        monthCashOut -= monthlyInflow
+        // 如果 monthCashOut 变成负数（净流入 > 流出），surplus 进 offset
+        if (monthCashOut < 0) {
+          offsetBal += -monthCashOut
+          monthCashOut = 0
+        }
+      }
       monthlyOutflows.push(monthCashOut)
 
       // ── 不含 offset 对照 ──
@@ -537,6 +594,8 @@ export function calculateAll(inputs: Inputs): CalculationResult {
       totalInterestNoOffset: totalInterestNo,
       monthlyOutflows,
       annualPayments,
+      totalRentReceived,
+      totalTaxBenefit,
     }
   }
   const buyAtHold = simulateBuyPath(holdYears * 12)
@@ -618,6 +677,9 @@ export function calculateAll(inputs: Inputs): CalculationResult {
     commissionFraction,
     annualPayments: buyAtHold.annualPayments,
     effectiveLoanFinal: Math.max(0, remainingLoan - finalOffsetBalance),
+    totalRentReceived: buyAtHold.totalRentReceived,
+    totalTaxBenefit: buyAtHold.totalTaxBenefit,
+    investmentYears: Math.max(0, holdYears - convertYear),
   }
 
   // 年度资产对比（每年 1 个数据点）

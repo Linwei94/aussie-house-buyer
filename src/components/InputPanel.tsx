@@ -32,6 +32,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
   const [openAdvanced, setOpenAdvanced] = useState(true)
   const [openBuyCosts, setOpenBuyCosts] = useState(false)
   const [openSellCosts, setOpenSellCosts] = useState(false)
+  const [openInvestment, setOpenInvestment] = useState(false)
 
   const update = (patch: Partial<Inputs>) => onChange({ ...inputs, ...patch })
 
@@ -407,6 +408,99 @@ export default function InputPanel({ inputs, onChange }: Props) {
               value={sellCosts.staging}
               onChange={(v) => updateSellCosts({ staging: v })}
             />
+          </div>
+        </CollapsibleSection>
+
+        {/* ──── 转投资房 + 负扣税 ──── */}
+        <CollapsibleSection
+          title="🏘️ 转投资房 + 负扣税"
+          subtitle="（自住若干年后转出租）"
+          open={openInvestment}
+          onToggle={() => setOpenInvestment(!openInvestment)}
+        >
+          <div className="space-y-3">
+            <div className="rounded-md bg-purple-50 p-2.5">
+              <p className="mb-2 text-xs font-semibold text-purple-900">
+                ⚠️ 默认不启用（永远自住）。填了"转投资年份" 才激活。
+              </p>
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">转投资年份（结算后第几年）</Label>
+                  <Input
+                    type="number"
+                    placeholder="留空=永远自住，2=住 2 年后转投资"
+                    min={0}
+                    max={inputs.holdYears}
+                    value={inputs.convertToInvestmentYear ?? ''}
+                    onChange={(e) =>
+                      update({
+                        convertToInvestmentYear:
+                          e.target.value === ''
+                            ? undefined
+                            : Number(e.target.value),
+                      })
+                    }
+                    className="text-sm"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    注意：FHBAS 要求结算后连续居住 12 个月，FHG 要求自住，少于 1
+                    年会触发追缴。
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">边际税率</Label>
+                  <div className="grid grid-cols-5 gap-1">
+                    {[16, 30, 32, 37, 45].map((r) => (
+                      <Button
+                        key={r}
+                        size="sm"
+                        variant={
+                          (inputs.marginalTaxRate ?? 32) === r
+                            ? 'default'
+                            : 'outline'
+                        }
+                        onClick={() => update({ marginalTaxRate: r })}
+                        className="px-1 text-xs"
+                      >
+                        {r}%
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    16%≈$45K-$135K · 30%≈$45K-$135K · 32%≈$135K-$190K ·
+                    37%≈$190K+ · 45%≈最高档
+                  </p>
+                </div>
+                <NumberOverrideField
+                  label="年度折旧"
+                  prefix="$"
+                  defaultValue={4000}
+                  value={inputs.annualDepreciation}
+                  onChange={(v) => update({ annualDepreciation: v })}
+                  step={500}
+                />
+                <NumberOverrideField
+                  label="物业管理"
+                  suffix="%"
+                  defaultValue={7}
+                  value={inputs.propMgmtPct}
+                  onChange={(v) => update({ propMgmtPct: v })}
+                  step={0.5}
+                />
+                <NumberOverrideField
+                  label="空置率"
+                  suffix="%"
+                  defaultValue={4}
+                  value={inputs.vacancyRate}
+                  onChange={(v) => update({ vacancyRate: v })}
+                  step={1}
+                />
+              </div>
+              <p className="mt-2 text-[10px] leading-tight text-purple-900/70">
+                投资期：年租金 + 退税作为现金流入 → 减少月度净支出，盈余进 offset。
+                负扣税额 = (净租金 − 利息 − 持有 − 折旧) × 边际税率。
+              </p>
+            </div>
           </div>
         </CollapsibleSection>
 
