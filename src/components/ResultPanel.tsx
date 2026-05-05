@@ -430,9 +430,26 @@ function FormulaVisualization({
             title={`② 买房路径 ${N} 年后状态`}
             colored="text-emerald-700"
           >
-            <FormulaLine>每月对每月: 利息按 (贷款余额 − Offset) × 利率/12 计算</FormulaLine>
             <FormulaLine>
-              {' '}
+              每月利息 = max(0, 贷款余额 − Offset 余额) × 月利率
+            </FormulaLine>
+            <FormulaLine>
+              每年 P&I 月供按"有效贷款 = 贷款余额 − Offset"重算 → offset
+              满了月供归零
+            </FormulaLine>
+            {be.annualPayments && be.annualPayments.length > 0 && (
+              <div className="mt-1 grid grid-cols-4 gap-1 rounded bg-emerald-50 p-1.5 text-[10px]">
+                {be.annualPayments.slice(0, Math.min(N, 8)).map((pay, i) => (
+                  <div key={i} className="text-center">
+                    <div className="text-emerald-700/60">Y{i + 1}</div>
+                    <div className="font-semibold tabular-nums">
+                      {pay > 0 ? formatCurrency(pay) : '$0 ✓'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <FormulaLine className="pt-1">
               累计利息已付 ={' '}
               <strong>{formatCurrency(be.totalInterestPaid)}</strong>
               {offsetInitial + offsetMonthly > 0 && (
@@ -445,13 +462,20 @@ function FormulaVisualization({
               )}
             </FormulaLine>
             <FormulaLine>
-              剩余贷款 ={' '}
-              <strong>{formatCurrency(be.remainingLoan)}</strong>
+              剩余贷款 = <strong>{formatCurrency(be.remainingLoan)}</strong>
             </FormulaLine>
             <FormulaLine>
-              Offset 余额 = {formatCurrency(offsetInitial)} + {N * 12} 个月 ×{' '}
-              {formatCurrency(offsetMonthly)} ={' '}
+              Offset 余额 = {formatCurrency(offsetInitial)} + 累计{' '}
+              {formatCurrency(offsetMonthly * N * 12)} 月增（含还清后释放） ={' '}
               <strong>{formatCurrency(be.finalOffsetBalance)}</strong>
+            </FormulaLine>
+            <FormulaLine className="border-t pt-1">
+              <strong>
+                有效贷款（你实际还需偿还）= 剩余贷款 − Offset = max(0,{' '}
+                {formatCurrency(be.remainingLoan)} −{' '}
+                {formatCurrency(be.finalOffsetBalance)}) ={' '}
+                {formatCurrency(be.effectiveLoanFinal)}
+              </strong>
             </FormulaLine>
           </FormulaBlock>
 

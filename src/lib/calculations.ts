@@ -372,6 +372,8 @@ export interface BreakevenResult {
   rentPathContributions: number // 累积投入个人投资的差额（不含初始）
   periodsPerYear: number // 26 if fortnightly else 12
   commissionFraction: number
+  annualPayments: number[] // 每年 P&I 月供（含 offset 重算后）
+  effectiveLoanFinal: number // 最终有效贷款 = loan − offset
 }
 
 export interface YearlyComparisonPoint {
@@ -457,28 +459,41 @@ export function calculateAll(inputs: Inputs): CalculationResult {
   const rentFrequency = inputs.rentFrequency ?? 'fortnightly'
   const periodsPerYear = rentFrequency === 'fortnightly' ? 26 : 12
 
-  // 买房路径：含 offset + 可变利率 的月度摊销
-  // 修复点：① 利率每年可不同（曲线）② P&I 每年按新利率 + 剩余期重算 ③ offset 月增放在月末 ④ 当月本金超出余额时 → 多余流入 offset（不丢掉）⑤ 输出年度现金流给 rent path 做公平对比
+  // 买房路径：含 offset + 可变利率 的月度摊销（Model B: P&I 按"有效贷款"重算）
+  // 关键逻辑：
+  //   ① 利率按年取自曲线（rateAtYear）
+  //   ② P&I 每年按 (有效贷款 = loanBal − offsetBal, 当年利率, 剩余期) 重算
+  //      → offset 满了 → effLoan = 0 → currentPayment = 0（不用付月供）
+  //      → offset 部分覆盖 → 月供按缩水后的有效贷款算（"要交的贷款变少"）
+  //   ③ offset 月增放在月末（本月利息按月初 offset 算，更保守）
+  //   ④ 输出每月真实现金流给 rent path 做公平对比
+  //   ⑤ 同时跑一份"无 offset"对照，用于显示节省了多少利息
   const simulateBuyPath = (months: number) => {
     let loanBal = loan
     let offsetBal = offsetInitial
     let loanBalNo = loan
     let totalInterest = 0
     let totalInterestNo = 0
-    let currentPayment = monthlyPayment(loan, rateAtYear(0), loanTerm)
-    let currentPaymentNo = currentPayment
+    // 初始 P&I 按 effLoan 计算
+    const effLoan0 = Math.max(0, loanBal - offsetBal)
+    let currentPayment =
+      effLoan0 > 0 ? monthlyPayment(effLoan0, rateAtYear(0), loanTerm) : 0
+    let currentPaymentNo = monthlyPayment(loan, rateAtYear(0), loanTerm)
     const monthlyOutflows: number[] = [] // 按月：当月实际现金流出（含 offset 月增）
+    const annualPayments: number[] = [currentPayment] // 每年 P&I 月供（用于公式可视化）
 
     for (let m = 1; m <= months; m++) {
       const yearIdx = Math.floor((m - 1) / 12)
       const annualRate = rateAtYear(yearIdx)
       const monthlyRate = annualRate / 100 / 12
 
-      // 每年第一个月：按 (剩余余额, 新利率, 剩余期) 重算 P&I（AU 变利率常态）
+      // 每年第一个月（年初）：按 (有效贷款, 新利率, 剩余期) 重算 P&I
       if ((m - 1) % 12 === 0 && m > 1) {
         const yearsLeft = loanTerm - yearIdx
-        if (loanBal > 0)
-          currentPayment = monthlyPayment(loanBal, annualRate, yearsLeft)
+        const effLoanNow = Math.max(0, loanBal - offsetBal)
+        currentPayment =
+          effLoanNow > 0 ? monthlyPayment(effLoanNow, annualRate, yearsLeft) : 0
+        annualPayments.push(currentPayment)
         if (loanBalNo > 0)
           currentPaymentNo = monthlyPayment(loanBalNo, annualRate, yearsLeft)
       }
@@ -489,7 +504,7 @@ export function calculateAll(inputs: Inputs): CalculationResult {
       totalInterest += interest
 
       let monthCashOut = 0
-      if (loanBal > 0) {
+      if (currentPayment > 0 && loanBal > 0) {
         const principalDue = currentPayment - interest
         if (principalDue >= loanBal) {
           // 当月本金超过剩余 → 还清 + 多余进 offset
@@ -500,12 +515,10 @@ export function calculateAll(inputs: Inputs): CalculationResult {
           loanBal -= principalDue
         }
         monthCashOut += currentPayment
-      } else {
-        // 贷款已还清，月供这部分自由现金 → 进 offset
-        offsetBal += currentPayment
-        monthCashOut += currentPayment
       }
-      // 月末追加 offset 存款（保守：本月利息按月初 offset 算）
+      // currentPayment === 0 时：offset 完全覆盖 effLoan，不向银行付任何钱
+
+      // 月末追加 offset 存款
       offsetBal += offsetMonthly
       monthCashOut += offsetMonthly
       monthlyOutflows.push(monthCashOut)
@@ -523,6 +536,7 @@ export function calculateAll(inputs: Inputs): CalculationResult {
       totalInterestPaid: totalInterest,
       totalInterestNoOffset: totalInterestNo,
       monthlyOutflows,
+      annualPayments,
     }
   }
   const buyAtHold = simulateBuyPath(holdYears * 12)
@@ -602,6 +616,8 @@ export function calculateAll(inputs: Inputs): CalculationResult {
     rentPathContributions: rentAtHold.totalContrib,
     periodsPerYear,
     commissionFraction,
+    annualPayments: buyAtHold.annualPayments,
+    effectiveLoanFinal: Math.max(0, remainingLoan - finalOffsetBalance),
   }
 
   // 年度资产对比（每年 1 个数据点）
