@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import {
@@ -19,14 +20,20 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import type { CalculationResult } from '@/lib/calculations'
+import {
+  calculateAll,
+  type CalculationResult,
+  type Inputs,
+} from '@/lib/calculations'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 
 interface Props {
   result: CalculationResult
+  inputs: Inputs
+  onInputsChange: (next: Inputs) => void
 }
 
-export default function ResultPanel({ result }: Props) {
+export default function ResultPanel({ result, inputs, onInputsChange }: Props) {
   return (
     <div className="space-y-4">
       <PolicyFlags result={result} />
@@ -34,13 +41,17 @@ export default function ResultPanel({ result }: Props) {
       <UpfrontBreakdown result={result} />
       <MonthlyBreakdown result={result} />
       <SellCostsBreakdown result={result} />
-      <BreakevenSection result={result} />
+      <BreakevenSection
+        result={result}
+        inputs={inputs}
+        onInputsChange={onInputsChange}
+      />
       <ComparisonChart result={result} />
     </div>
   )
 }
 
-function PolicyFlags({ result }: Props) {
+function PolicyFlags({ result }: { result: CalculationResult }) {
   if (result.flags.length === 0) return null
   return (
     <div className="flex flex-wrap gap-2">
@@ -62,7 +73,7 @@ function PolicyFlags({ result }: Props) {
   )
 }
 
-function KeyNumbers({ result }: Props) {
+function KeyNumbers({ result }: { result: CalculationResult }) {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
       <Card>
@@ -105,7 +116,7 @@ function KeyNumbers({ result }: Props) {
   )
 }
 
-function UpfrontBreakdown({ result }: Props) {
+function UpfrontBreakdown({ result }: { result: CalculationResult }) {
   return (
     <Card>
       <CardHeader>
@@ -154,7 +165,7 @@ function UpfrontBreakdown({ result }: Props) {
   )
 }
 
-function MonthlyBreakdown({ result }: Props) {
+function MonthlyBreakdown({ result }: { result: CalculationResult }) {
   const h = result.holdingCosts
   return (
     <Card>
@@ -184,7 +195,7 @@ function MonthlyBreakdown({ result }: Props) {
   )
 }
 
-function SellCostsBreakdown({ result }: Props) {
+function SellCostsBreakdown({ result }: { result: CalculationResult }) {
   const [open, setOpen] = useState(false)
   const sc = result.breakeven.expectedSellCosts
   return (
@@ -235,10 +246,22 @@ function SellCostsBreakdown({ result }: Props) {
   )
 }
 
-function BreakevenSection({ result }: Props) {
+function BreakevenSection({
+  result,
+  inputs,
+  onInputsChange,
+}: {
+  result: CalculationResult
+  inputs: Inputs
+  onInputsChange: (next: Inputs) => void
+}) {
   const be = result.breakeven
   const appreciate = be.requiredAnnualGrowth
   const sydneyHist = 3.0
+  const etfRate = inputs.etfReturnPct ?? 7
+  const rentPerWeek = inputs.rentNowPerWeek ?? 700
+  const rentGrowth = inputs.rentGrowthPct ?? 3
+
   const verdict =
     appreciate < 2
       ? { color: 'text-emerald-600', label: '门槛非常低，达成概率高' }
@@ -248,14 +271,31 @@ function BreakevenSection({ result }: Props) {
           ? { color: 'text-amber-600', label: '接近悉尼公寓历史均线，需选好区' }
           : { color: 'text-red-600', label: '高于历史均线，挑战较大' }
 
+  // 敏感性：ETF 改成 5% / 9% 时，盈亏平衡卖价会怎么变
+  const sensitivity = useMemo(() => {
+    const lo = calculateAll({ ...inputs, etfReturnPct: Math.max(2, etfRate - 2) })
+    const hi = calculateAll({ ...inputs, etfReturnPct: etfRate + 2 })
+    return {
+      loRate: Math.max(2, etfRate - 2),
+      loPrice: lo.breakeven.breakevenSalePrice,
+      loGrowth: lo.breakeven.requiredAnnualGrowth,
+      hiRate: etfRate + 2,
+      hiPrice: hi.breakeven.breakevenSalePrice,
+      hiGrowth: hi.breakeven.requiredAnnualGrowth,
+    }
+  }, [inputs, etfRate])
+
+  const update = (patch: Partial<Inputs>) =>
+    onInputsChange({ ...inputs, ...patch })
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-sm">
-          {result.scenarioYears} 年后要赚钱，需要房子涨多少
+          {result.scenarioYears} 年后买房 vs 租房+ETF：要赚钱房价需涨多少
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
+      <CardContent className="space-y-3 text-sm">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-xs text-muted-foreground">盈亏平衡卖价</p>
@@ -274,16 +314,57 @@ function BreakevenSection({ result }: Props) {
           </div>
         </div>
         <p className={`pt-1 text-sm ${verdict.color}`}>{verdict.label}</p>
+
+        {/* 内嵌可编辑关键假设 */}
+        <div className="mt-3 rounded-md border border-dashed bg-muted/30 p-3">
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">
+            🎛 关键假设（直接编辑会实时重算）
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <InlineNumberField
+              label="ETF 年化"
+              suffix="%"
+              value={etfRate}
+              onChange={(v) => update({ etfReturnPct: v })}
+              step={0.5}
+              hint="不买房去投资能拿到的回报"
+            />
+            <InlineNumberField
+              label="现租金"
+              prefix="$"
+              suffix="/周"
+              value={rentPerWeek}
+              onChange={(v) => update({ rentNowPerWeek: v })}
+              step={10}
+              hint="不买房需要付的租金"
+            />
+            <InlineNumberField
+              label="租金年涨"
+              suffix="%"
+              value={rentGrowth}
+              onChange={(v) => update({ rentGrowthPct: v })}
+              step={0.5}
+              hint="预期租金通胀"
+            />
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            💡 ETF 假设的敏感性：
+            {sensitivity.loRate}% → 平衡 {formatCurrency(sensitivity.loPrice)}（涨 {formatPercent(sensitivity.loGrowth, 2)}）；
+            {sensitivity.hiRate}% → 平衡 {formatCurrency(sensitivity.hiPrice)}（涨 {formatPercent(sensitivity.hiGrowth, 2)}）
+          </p>
+        </div>
+
         <div className="mt-2 space-y-1 border-t pt-2 text-xs text-muted-foreground">
           <p>
-            假设：租房等价方案 = 现租金 + 月度差额投 ETF（年化 7%）
+            <strong>对比逻辑</strong>：买房卖出净到手 ≥ 同期租房 + 把入场现金和月度差额都投 ETF（年化 {etfRate}%）的资产终值
           </p>
           <p>
-            对比终值：买房估值−剩余贷款−卖出成本 ≥ 租房路径资产 ${' '}
-            {formatCurrency(be.rentPathAssets)}
+            租房路径 {result.scenarioYears} 年后总资产：
+            <strong>{formatCurrency(be.rentPathAssets)}</strong>
           </p>
           <p>
-            含中介佣金 + 营销 + 律师 + discharge 等卖出成本（合计估算 {formatCurrency(be.expectedSellCosts.total)}）
+            含卖出成本（中介 {(inputs.sellCosts?.agentCommissionPct ?? 2.2)}% +
+            营销 + 律师 + discharge 等，合计 {formatCurrency(be.expectedSellCosts.total)}）
           </p>
         </div>
       </CardContent>
@@ -291,7 +372,58 @@ function BreakevenSection({ result }: Props) {
   )
 }
 
-function ComparisonChart({ result }: Props) {
+function InlineNumberField({
+  label,
+  prefix,
+  suffix,
+  value,
+  onChange,
+  step = 1,
+  hint,
+}: {
+  label: string
+  prefix?: string
+  suffix?: string
+  value: number
+  onChange: (v: number) => void
+  step?: number
+  hint?: string
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-[10px] font-medium text-muted-foreground">
+        {label}
+      </label>
+      <div className="relative">
+        {prefix && (
+          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+            {prefix}
+          </span>
+        )}
+        <Input
+          type="number"
+          step={step}
+          value={value}
+          onChange={(e) => {
+            const v = Number(e.target.value)
+            if (!isNaN(v)) onChange(v)
+          }}
+          className={`h-8 text-sm tabular-nums ${prefix ? 'pl-5' : ''} ${suffix ? 'pr-8' : ''}`}
+        />
+        {suffix && (
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+            {suffix}
+          </span>
+        )}
+      </div>
+      {hint && (
+        <p className="text-[9px] leading-tight text-muted-foreground">{hint}</p>
+      )}
+    </div>
+  )
+}
+
+function ComparisonChart({ result }: { result: CalculationResult }) {
   const data = result.yearlyComparison.map((p) => ({
     year: p.year,
     买房净资产: Math.round(p.buyEquity),

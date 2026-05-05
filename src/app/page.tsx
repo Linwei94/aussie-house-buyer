@@ -25,7 +25,7 @@ export default function Home() {
           <InputPanel inputs={inputs} onChange={setInputs} />
         </div>
         <div>
-          <ResultPanel result={result} />
+          <ResultPanel result={result} inputs={inputs} onInputsChange={setInputs} />
         </div>
       </div>
 

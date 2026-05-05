@@ -28,7 +28,7 @@ interface Props {
 
 export default function InputPanel({ inputs, onChange }: Props) {
   const [openProperty, setOpenProperty] = useState(true)
-  const [openAdvanced, setOpenAdvanced] = useState(false)
+  const [openAdvanced, setOpenAdvanced] = useState(true)
   const [openBuyCosts, setOpenBuyCosts] = useState(false)
   const [openSellCosts, setOpenSellCosts] = useState(false)
 
