@@ -23,9 +23,13 @@ export interface Inputs {
   interestRate?: number // 自住默认 5.99%（5%首付）/ 5.74%（>=20%首付）；投资 6.14%
   loanTermYears?: number // 默认 30
   rentNowPerWeek?: number // "如果租房" 起步周租，默认 700
+  rentFrequency?: 'monthly' | 'fortnightly' // 租房 + ETF 节奏，默认 fortnightly
   rentGrowthPct?: number // 默认 3
   etfReturnPct?: number // 默认 7
   appreciationPct?: number // 默认 4
+  // Offset 账户
+  offsetInitial?: number // 初始 offset 余额（$），默认 0
+  offsetMonthly?: number // 每月新增 offset（$），默认 0
   // 具体房产数据 override（手动；未来 agent 自动填）
   propertyData?: PropertyData
   // 买卖费用 override
@@ -359,6 +363,14 @@ export interface BreakevenResult {
   requiredAnnualGrowth: number
   flatSellCosts: number // 不随房价变的卖房成本
   expectedSellCosts: SellCostsBreakdown // @ break-even price
+  // 中间量（用于公式可视化）
+  finalOffsetBalance: number
+  totalInterestPaid: number
+  totalInterestNoOffset: number // 不用 offset 的对照
+  rentPathInitial: number // 入场现金 + offset 初始
+  rentPathContributions: number // 累积投入 ETF 的差额（不含初始）
+  periodsPerYear: number // 26 if fortnightly else 12
+  commissionFraction: number
 }
 
 export interface YearlyComparisonPoint {
@@ -427,38 +439,78 @@ export function calculateAll(inputs: Inputs): CalculationResult {
   const monthlyTotal = monthlyMortgage + monthlyHolding
   const weeklyRent = estimateWeeklyRent(price, propertyData)
 
-  // 持有 N 年后
-  const remainingLoan = remainingPrincipal(
-    loan,
-    interestRate,
-    loanTerm,
-    holdYears,
-  )
+  // Offset 与节奏
+  const offsetInitial = inputs.offsetInitial ?? 0
+  const offsetMonthly = inputs.offsetMonthly ?? 0
+  const rentFrequency = inputs.rentFrequency ?? 'fortnightly'
+  const periodsPerYear = rentFrequency === 'fortnightly' ? 26 : 12
 
-  // 租房路径资产
-  const rentNowPerWeek = inputs.rentNowPerWeek ?? 700
-  const monthlyRentNow = (rentNowPerWeek * 52) / 12
-  const monthlyRentSavedVsBuying = monthlyTotal - monthlyRentNow
+  // 买房路径：含 offset 的月度摊销（用月利率，逐月 simulate）
+  const monthlyRate = interestRate / 100 / 12
+  const monthlyMortgageActual = monthlyMortgage // P&I 不变
+  const simulateBuyPath = (months: number) => {
+    let loanBal = loan
+    let offsetBal = offsetInitial
+    let totalInterest = 0
+    let totalInterestNoOffset = 0
+    let loanBalNoOffset = loan
+    for (let m = 1; m <= months; m++) {
+      // 含 offset 版本
+      offsetBal += offsetMonthly
+      const effectiveLoan = Math.max(0, loanBal - offsetBal)
+      const interest = effectiveLoan * monthlyRate
+      totalInterest += interest
+      const principal = monthlyMortgageActual - interest
+      loanBal = Math.max(0, loanBal - principal)
 
-  // 月度差额 + 入场 cash 全部投 ETF（年化 etfReturn）
-  // 月化 ETF 收益率
-  const monthlyETF = Math.pow(1 + etfReturn, 1 / 12) - 1
-  let rentPathAssets = upfrontCash
-  let monthlyRentNowDynamic = monthlyRentNow
-  for (let m = 0; m < holdYears * 12; m++) {
-    rentPathAssets = rentPathAssets * (1 + monthlyETF)
-    // 注意：买房月供超过同期租金的部分，租房者可省下投入 ETF
-    const monthlyContribution = monthlyTotal - monthlyRentNowDynamic
-    rentPathAssets += monthlyContribution
-    // 每 12 个月租金涨一次
-    if ((m + 1) % 12 === 0) {
-      monthlyRentNowDynamic *= 1 + rentGrowth
+      // 不含 offset 对照
+      const interestNo = loanBalNoOffset * monthlyRate
+      totalInterestNoOffset += interestNo
+      const principalNo = monthlyMortgageActual - interestNo
+      loanBalNoOffset = Math.max(0, loanBalNoOffset - principalNo)
+    }
+    return {
+      loanBalance: loanBal,
+      offsetBalance: offsetBal,
+      totalInterestPaid: totalInterest,
+      totalInterestNoOffset,
     }
   }
+  const buyAtHold = simulateBuyPath(holdYears * 12)
+  const remainingLoan = buyAtHold.loanBalance
+  const finalOffsetBalance = buyAtHold.offsetBalance
 
-  // Break-even 公式：sale - sellCosts(sale) - remainingLoan = rentPathAssets
-  // sale × (1 - commissionPct) - flatSellCosts - remainingLoan = rentPathAssets
-  // sale = (rentPathAssets + remainingLoan + flatSellCosts) / (1 - commissionPct)
+  // 租房路径资产（fortnightly 或 monthly 节奏）
+  const rentNowPerWeek = inputs.rentNowPerWeek ?? 700
+  const periodETF = Math.pow(1 + etfReturn, 1 / periodsPerYear) - 1
+  const annualRent = rentNowPerWeek * 52
+  const annualBuyOutflow = monthlyTotal * 12 + offsetMonthly * 12
+  // 公平对比：买家放进 offset 的钱，租家也存进 ETF（毕竟同样是工资余额）
+
+  const simulateRentPath = (years: number) => {
+    const periods = Math.round(years * periodsPerYear)
+    let assets = upfrontCash + offsetInitial
+    let annualRentDyn = annualRent
+    let totalContrib = 0
+    for (let p = 0; p < periods; p++) {
+      const periodRent = annualRentDyn / periodsPerYear
+      const periodBuy = annualBuyOutflow / periodsPerYear
+      const periodContrib = periodBuy - periodRent
+      assets = assets * (1 + periodETF)
+      assets += periodContrib
+      totalContrib += periodContrib
+      if ((p + 1) % periodsPerYear === 0) {
+        annualRentDyn *= 1 + rentGrowth
+      }
+    }
+    return { assets, totalContrib }
+  }
+  const rentAtHold = simulateRentPath(holdYears)
+  const rentPathAssets = rentAtHold.assets
+
+  // Break-even 公式（含 offset）：
+  // saleP × (1 - comm%) - flatSellCosts - remainingLoan + offsetBalance = rentPathAssets
+  // saleP = (rentPathAssets + remainingLoan - offsetBalance + flatSellCosts) / (1 - comm%)
   const flatSellCosts =
     sellCosts.marketingFee +
     sellCosts.auctioneerFee +
@@ -467,7 +519,8 @@ export function calculateAll(inputs: Inputs): CalculationResult {
     sellCosts.staging
   const commissionFraction = sellCosts.agentCommissionPct / 100
   const breakevenSalePrice =
-    (rentPathAssets + remainingLoan + flatSellCosts) / (1 - commissionFraction)
+    (rentPathAssets + remainingLoan - finalOffsetBalance + flatSellCosts) /
+    (1 - commissionFraction)
   const requiredAnnualGrowth =
     Math.pow(breakevenSalePrice / price, 1 / holdYears) - 1
   const expectedSellCostsAtBE = totalSellingCosts(breakevenSalePrice, sellCosts)
@@ -479,27 +532,25 @@ export function calculateAll(inputs: Inputs): CalculationResult {
     requiredAnnualGrowth: requiredAnnualGrowth * 100,
     flatSellCosts,
     expectedSellCosts: expectedSellCostsAtBE,
+    finalOffsetBalance,
+    totalInterestPaid: buyAtHold.totalInterestPaid,
+    totalInterestNoOffset: buyAtHold.totalInterestNoOffset,
+    rentPathInitial: upfrontCash + offsetInitial,
+    rentPathContributions: rentAtHold.totalContrib,
+    periodsPerYear,
+    commissionFraction,
   }
 
   // 年度资产对比（每年 1 个数据点）
   const yearlyComparison: YearlyComparisonPoint[] = []
   for (let y = 0; y <= holdYears; y++) {
     const houseValue = price * Math.pow(1 + appreciation, y)
-    const rl = remainingPrincipal(loan, interestRate, loanTerm, y)
+    const buyAtY = simulateBuyPath(y * 12)
+    const rentAtY = simulateRentPath(y)
     const sellCostsAtY = totalSellingCosts(houseValue, sellCosts).total
-    const buyEquity = houseValue - rl - sellCostsAtY
-
-    // 租房路径同期资产（用 ETF 复利累积同期 cash 流）
-    let rpa = upfrontCash
-    let monthlyRentDyn = monthlyRentNow
-    for (let m = 0; m < y * 12; m++) {
-      rpa = rpa * (1 + monthlyETF)
-      rpa += monthlyTotal - monthlyRentDyn
-      if ((m + 1) % 12 === 0) {
-        monthlyRentDyn *= 1 + rentGrowth
-      }
-    }
-    yearlyComparison.push({ year: y, buyEquity, rentAssets: rpa })
+    const buyEquity =
+      houseValue - buyAtY.loanBalance + buyAtY.offsetBalance - sellCostsAtY
+    yearlyComparison.push({ year: y, buyEquity, rentAssets: rentAtY.assets })
   }
 
   // 政策提示
@@ -583,9 +634,12 @@ export const DEFAULT_INPUTS: Inputs = {
   isNewBuild: false,
   holdYears: 8,
   rentNowPerWeek: 700,
+  rentFrequency: 'fortnightly',
   rentGrowthPct: 3,
   etfReturnPct: 7,
   appreciationPct: 4,
+  offsetInitial: 0,
+  offsetMonthly: 0,
   propertyData: {},
   buyCosts: {},
   sellCosts: {},

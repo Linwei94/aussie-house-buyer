@@ -440,6 +440,65 @@ export default function InputPanel({ inputs, onChange }: Props) {
               onChange={(v) => update({ appreciationPct: v })}
               step={0.5}
             />
+
+            {/* 租金支付节奏 */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">租金支付节奏</Label>
+              <div className="grid grid-cols-2 gap-1">
+                <Button
+                  variant={
+                    (inputs.rentFrequency ?? 'fortnightly') === 'fortnightly'
+                      ? 'default'
+                      : 'outline'
+                  }
+                  size="sm"
+                  onClick={() => update({ rentFrequency: 'fortnightly' })}
+                >
+                  每两周
+                </Button>
+                <Button
+                  variant={
+                    inputs.rentFrequency === 'monthly' ? 'default' : 'outline'
+                  }
+                  size="sm"
+                  onClick={() => update({ rentFrequency: 'monthly' })}
+                >
+                  每月
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                影响 ETF 复利节奏（每两周 = 26 期/年，更贴合实际现金流）
+              </p>
+            </div>
+
+            {/* Offset 账户 */}
+            <div className="rounded-md bg-blue-50 p-2.5">
+              <p className="mb-2 text-xs font-semibold text-blue-900">
+                💰 Offset 账户（高收入用户福利）
+              </p>
+              <div className="space-y-2">
+                <NumberOverrideField
+                  label="初始 offset 余额"
+                  prefix="$"
+                  defaultValue={0}
+                  value={inputs.offsetInitial}
+                  onChange={(v) => update({ offsetInitial: v })}
+                  step={1000}
+                />
+                <NumberOverrideField
+                  label="每月新增 offset"
+                  prefix="$"
+                  defaultValue={0}
+                  value={inputs.offsetMonthly}
+                  onChange={(v) => update({ offsetMonthly: v })}
+                  step={500}
+                />
+              </div>
+              <p className="mt-1.5 text-[10px] leading-tight text-blue-900/70">
+                Offset 账户里的钱抵消等额贷款利息。$50K 在 offset = 月省利息 $250（@5.99%）。
+                公平对比：租房路径会把同样的钱投 ETF。
+              </p>
+            </div>
           </div>
         </CollapsibleSection>
       </CardContent>

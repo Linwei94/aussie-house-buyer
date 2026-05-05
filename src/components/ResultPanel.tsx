@@ -354,21 +354,176 @@ function BreakevenSection({
           </p>
         </div>
 
-        <div className="mt-2 space-y-1 border-t pt-2 text-xs text-muted-foreground">
-          <p>
-            <strong>对比逻辑</strong>：买房卖出净到手 ≥ 同期租房 + 把入场现金和月度差额都投 ETF（年化 {etfRate}%）的资产终值
-          </p>
-          <p>
-            租房路径 {result.scenarioYears} 年后总资产：
-            <strong>{formatCurrency(be.rentPathAssets)}</strong>
-          </p>
-          <p>
-            含卖出成本（中介 {(inputs.sellCosts?.agentCommissionPct ?? 2.2)}% +
-            营销 + 律师 + discharge 等，合计 {formatCurrency(be.expectedSellCosts.total)}）
-          </p>
-        </div>
+        {/* 公式形象化 */}
+        <FormulaVisualization result={result} inputs={inputs} />
       </CardContent>
     </Card>
+  )
+}
+
+function FormulaVisualization({
+  result,
+  inputs,
+}: {
+  result: CalculationResult
+  inputs: Inputs
+}) {
+  const [open, setOpen] = useState(false)
+  const be = result.breakeven
+  const N = result.scenarioYears
+  const etfRate = inputs.etfReturnPct ?? 7
+  const offsetInitial = inputs.offsetInitial ?? 0
+  const offsetMonthly = inputs.offsetMonthly ?? 0
+  const cadence = (inputs.rentFrequency ?? 'fortnightly') === 'fortnightly' ? '每两周' : '每月'
+
+  const interestSaved = be.totalInterestNoOffset - be.totalInterestPaid
+
+  return (
+    <div className="mt-3 border-t pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <span className="text-xs font-semibold text-muted-foreground">
+          📐 计算过程（{open ? '收起' : '点击展开看公式'}）
+        </span>
+        {open ? (
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+        )}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3 rounded-md bg-slate-50 p-3 font-mono text-[11px] leading-relaxed">
+          <FormulaBlock
+            title={`① 租房+ETF ${N} 年后总资产`}
+            colored="text-blue-700"
+          >
+            <FormulaLine>初始本金 = 入场现金 + Offset 初始</FormulaLine>
+            <FormulaLine>
+              {' '}
+              = {formatCurrency(result.upfrontCash)} +{' '}
+              {formatCurrency(offsetInitial)} ={' '}
+              <strong>{formatCurrency(be.rentPathInitial)}</strong>
+            </FormulaLine>
+            <FormulaLine>
+              每期 ETF 复利率 = (1 + {etfRate}%)^(1/{be.periodsPerYear}) − 1
+            </FormulaLine>
+            <FormulaLine>
+              每期投入 = ({cadence}买房支出 + offset 月增入) − {cadence}租金
+            </FormulaLine>
+            <FormulaLine>
+              累积投入（{N}年共 {N * be.periodsPerYear} 期）=
+              <strong> {formatCurrency(be.rentPathContributions)}</strong>
+            </FormulaLine>
+            <FormulaLine className="border-t pt-1.5">
+              <strong className="text-blue-700">
+                租房资产 = 复利后 ≈ {formatCurrency(be.rentPathAssets)}
+              </strong>
+            </FormulaLine>
+          </FormulaBlock>
+
+          <FormulaBlock
+            title={`② 买房路径 ${N} 年后状态`}
+            colored="text-emerald-700"
+          >
+            <FormulaLine>每月对每月: 利息按 (贷款余额 − Offset) × 利率/12 计算</FormulaLine>
+            <FormulaLine>
+              {' '}
+              累计利息已付 ={' '}
+              <strong>{formatCurrency(be.totalInterestPaid)}</strong>
+              {offsetInitial + offsetMonthly > 0 && (
+                <>
+                  {' '}
+                  <span className="text-emerald-700">
+                    （比无 offset 省 {formatCurrency(interestSaved)}）
+                  </span>
+                </>
+              )}
+            </FormulaLine>
+            <FormulaLine>
+              剩余贷款 ={' '}
+              <strong>{formatCurrency(be.remainingLoan)}</strong>
+            </FormulaLine>
+            <FormulaLine>
+              Offset 余额 = {formatCurrency(offsetInitial)} + {N * 12} 个月 ×{' '}
+              {formatCurrency(offsetMonthly)} ={' '}
+              <strong>{formatCurrency(be.finalOffsetBalance)}</strong>
+            </FormulaLine>
+          </FormulaBlock>
+
+          <FormulaBlock title="③ 盈亏平衡卖价（求解）" colored="text-amber-700">
+            <FormulaLine>条件：卖房净到手 = 租房资产</FormulaLine>
+            <FormulaLine>
+              卖价 × (1 − 中介%) − 固定卖出费 − 剩余贷款 + Offset 余额 = 租房资产
+            </FormulaLine>
+            <FormulaLine className="border-t pt-1.5">
+              卖价 = (租房资产 + 剩余贷款 − Offset + 固定卖出费) / (1 − 中介%)
+            </FormulaLine>
+            <FormulaLine>
+              {' '}
+              = ({formatCurrency(be.rentPathAssets)} +{' '}
+              {formatCurrency(be.remainingLoan)} −{' '}
+              {formatCurrency(be.finalOffsetBalance)} +{' '}
+              {formatCurrency(be.flatSellCosts)})
+            </FormulaLine>
+            <FormulaLine>
+              {' '}
+              ÷ (1 − {(be.commissionFraction * 100).toFixed(1)}%)
+            </FormulaLine>
+            <FormulaLine className="text-amber-700">
+              <strong>= {formatCurrency(be.breakevenSalePrice)}</strong>
+            </FormulaLine>
+          </FormulaBlock>
+
+          <FormulaBlock title="④ 推导年化涨幅" colored="text-purple-700">
+            <FormulaLine>
+              年化 = (盈亏平衡价 / 买入价)^(1/{N}) − 1
+            </FormulaLine>
+            <FormulaLine>
+              {' '}
+              = ({formatCurrency(be.breakevenSalePrice)} /{' '}
+              {formatCurrency(result.price)})^(1/{N}) − 1
+            </FormulaLine>
+            <FormulaLine className="text-purple-700">
+              <strong>= {formatPercent(be.requiredAnnualGrowth, 2)}</strong>
+            </FormulaLine>
+          </FormulaBlock>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FormulaBlock({
+  title,
+  colored,
+  children,
+}: {
+  title: string
+  colored: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <p className={`mb-1 text-[11px] font-semibold ${colored}`}>{title}</p>
+      <div className="space-y-0.5 pl-2">{children}</div>
+    </div>
+  )
+}
+
+function FormulaLine({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={`text-[11px] leading-relaxed text-slate-700 ${className ?? ''}`}>
+      {children}
+    </div>
   )
 }
 
