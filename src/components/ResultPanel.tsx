@@ -258,7 +258,8 @@ function BreakevenSection({
   const be = result.breakeven
   const appreciate = be.requiredAnnualGrowth
   const sydneyHist = 3.0
-  const etfRate = inputs.etfReturnPct ?? 7
+  const etfRate =
+    inputs.etfReturnPct ?? inputs.interestRate ?? result.interestRate
   const rentPerWeek = inputs.rentNowPerWeek ?? 700
   const rentGrowth = inputs.rentGrowthPct ?? 3
 
@@ -371,7 +372,8 @@ function FormulaVisualization({
   const [open, setOpen] = useState(false)
   const be = result.breakeven
   const N = result.scenarioYears
-  const etfRate = inputs.etfReturnPct ?? 7
+  const etfRate =
+    inputs.etfReturnPct ?? inputs.interestRate ?? result.interestRate
   const offsetInitial = inputs.offsetInitial ?? 0
   const offsetMonthly = inputs.offsetMonthly ?? 0
   const cadence = (inputs.rentFrequency ?? 'fortnightly') === 'fortnightly' ? '每两周' : '每月'

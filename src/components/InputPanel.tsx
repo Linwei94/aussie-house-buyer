@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Card,
   CardContent,
@@ -20,6 +20,7 @@ import {
   calculateHoldingCosts,
 } from '@/lib/calculations'
 import { formatCurrency } from '@/lib/utils'
+import InterestRateCurve from './InterestRateCurve'
 
 interface Props {
   inputs: Inputs
@@ -65,6 +66,23 @@ export default function InputPanel({ inputs, onChange }: Props) {
 
   const buyCosts = inputs.buyCosts ?? {}
   const sellCosts = inputs.sellCosts ?? {}
+
+  // 利率曲线：长度与 holdYears+1 同步（年 0..holdYears）
+  useEffect(() => {
+    const desiredLen = inputs.holdYears + 1
+    const curve = inputs.interestRateCurve
+    if (!curve || curve.length === 0) return // 用户没自定义则不动
+    if (curve.length === desiredLen) return
+    let next: number[]
+    if (curve.length < desiredLen) {
+      const last = curve[curve.length - 1]
+      next = [...curve, ...Array(desiredLen - curve.length).fill(last)]
+    } else {
+      next = curve.slice(0, desiredLen)
+    }
+    onChange({ ...inputs, interestRateCurve: next })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputs.holdYears])
 
   return (
     <Card className="sticky top-4">
@@ -401,13 +419,31 @@ export default function InputPanel({ inputs, onChange }: Props) {
         >
           <div className="space-y-3">
             <NumberOverrideField
-              label="贷款利率"
+              label="基准贷款利率"
               suffix="%"
               defaultValue={defaultRate}
               value={inputs.interestRate}
               onChange={(v) => update({ interestRate: v })}
               step={0.05}
             />
+
+            {/* 利率曲线（可拖动） */}
+            <InterestRateCurve
+              rates={
+                inputs.interestRateCurve ??
+                Array(inputs.holdYears + 1).fill(
+                  Math.round((inputs.interestRate ?? defaultRate) * 100) / 100,
+                )
+              }
+              onChange={(next) => update({ interestRateCurve: next })}
+              baseRate={inputs.interestRate ?? defaultRate}
+              minRate={1}
+              maxRate={Math.max(
+                10,
+                ...(inputs.interestRateCurve ?? [defaultRate]).map((r) => r + 1),
+              )}
+            />
+
             <NumberOverrideField
               label="对比：现租金"
               suffix="/周"
@@ -425,12 +461,12 @@ export default function InputPanel({ inputs, onChange }: Props) {
               step={0.5}
             />
             <NumberOverrideField
-              label="ETF 年化回报"
+              label="ETF/投资 年化回报"
               suffix="%"
-              defaultValue={7}
+              defaultValue={inputs.interestRate ?? defaultRate}
               value={inputs.etfReturnPct}
               onChange={(v) => update({ etfReturnPct: v })}
-              step={0.5}
+              step={0.25}
             />
             <NumberOverrideField
               label="房价年涨假设"
