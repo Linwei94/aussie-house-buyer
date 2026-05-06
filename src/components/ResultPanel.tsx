@@ -426,7 +426,7 @@ function FormulaVisualization({
                 /月（投资期）
               </FormulaLine>
               <FormulaLine className="border-t pt-1 text-[10px]">
-                这些净流入抵冲月度支出；多余部分进 offset。租金每年按租金涨幅复利。
+                投资期 buyer 的净流入（净租金 + 退税）全部进 offset，增加 buyer 的 wealth。租金每年按 rent 涨幅复利。租房路径用 baseline housing cost（不感知 buyer 的 landlord 行为）做对比。
               </FormulaLine>
             </FormulaBlock>
           )}

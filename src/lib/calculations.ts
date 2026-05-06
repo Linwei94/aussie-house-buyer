@@ -554,7 +554,12 @@ export function calculateAll(inputs: Inputs): CalculationResult {
       offsetBal += offsetMonthly
       monthCashOut += offsetMonthly
 
+      // ⚠️ 关键：先把 baseline housing cost 记下来（mortgage + offset 月增）
+      // 这个 baseline 用于 rent path 对比 —— 租房者不感知 buyer phase 2 的租金/退税
+      const baselineHousingCostThisMonth = monthCashOut
+
       // ── 转投资房 phase：负扣税 + 租金收入 ──
+      // 这部分只影响 buyer 自己的 wealth（流入 offset），不改 rent path baseline
       let monthRentReceived = 0
       let monthTaxEffect = 0
       if (isInvestmentYear(yearIdx)) {
@@ -575,16 +580,16 @@ export function calculateAll(inputs: Inputs): CalculationResult {
         monthTaxEffect = -monthlyTaxableRental * marginalTax // 正 = 退税；负 = 应付
         totalRentReceived += monthRentReceived
         totalTaxBenefit += monthTaxEffect
-        // 净流入（可能为负）
+        // 净流入（可能为负，但通常负扣税场景下为正）
         const monthlyInflow = monthRentReceived + monthTaxEffect
-        monthCashOut -= monthlyInflow
-        // 如果 monthCashOut 变成负数（净流入 > 流出），surplus 进 offset
-        if (monthCashOut < 0) {
-          offsetBal += -monthCashOut
-          monthCashOut = 0
+        // surplus 流入 offset → 增加 buyer 的 wealth (loanBal 实际利息减少)
+        if (monthlyInflow > 0) {
+          offsetBal += monthlyInflow
         }
+        // 注意：不要把 monthlyInflow 从 monthCashOut 里扣，否则 rent path 会跟着变
       }
-      monthlyOutflows.push(monthCashOut)
+      // rent path 用 baseline（不包含 phase 2 收租/退税）
+      monthlyOutflows.push(baselineHousingCostThisMonth)
 
       // ── 不含 offset 对照 ──
       const interestNo = loanBalNo * monthlyRate
