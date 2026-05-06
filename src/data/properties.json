@@ -14,8 +14,8 @@
     "weeklyRent": 720,
     "weeklyRentRange": [680, 780],
     "strataPerQuarter": 1095,
-    "councilPerYear": null,
-    "waterPerYear": null,
+    "councilPerYear": 1100,
+    "waterPerYear": 400,
     "suburbApartmentGrowth1Y": -9.5,
     "suburbApartmentGrowth5Y": null,
     "researchedAt": "2026-05-05",
@@ -25,7 +25,7 @@
       "https://www.htag.com.au/nsw/nsw314-city-of-parramatta-council/granville-nsw-2142/",
       "https://www.propertyvalue.com.au/suburb/granville-2142-nsw"
     ],
-    "notes": "3 房 + ensuite + stone benchtop + gas + 空调 + 车位 + 储物笼 + CBD 景观。125sqm 总 / 108sqm 内部。5 分钟走路到 Granville 火车站，35 分钟火车到 Sydney CBD。卖家 Soon Tee (LJ Hooker)。Granville 3BR unit 中位价 $677.5K（Domain Insight），本房 $750K 高 11%（合理：CBD 景观 + 面积大）。周租金估算 $720 基于 Granville 公寓 yield 6.12% + 3BR 房屋租 $740。Council/water 不在 listing 里，需 settle 前问 agent。1Y 涨幅 -9.5% (Cotality) vs +6.4% (其他) — 数据源分歧，请谨慎。",
+    "notes": "3 房 + ensuite + stone benchtop + gas + 空调 + 车位 + 储物笼 + CBD 景观。125sqm 总 / 108sqm 内部。5 分钟走路到 Granville 火车站。卖家 Soon Tee (LJ Hooker)。\n\n数据来源说明：\n- 价格 / 面积 / 房型 / strata：Domain listing 直接验证\n- 周租金 $720：Granville unit yield 6.12% + 3BR house 租 $740 推算（不是直接观察 3BR unit listing）\n- Council $1,100：Cumberland 2024-25 最低 $860 + IPART 7.1% peg + 公寓 land share 小 → 估算落在 $920-1,200 区间中位\n- Water $400：Sydney Water 2025-30 cycle，公寓业主 share 部分 fixed charge，使用费由租客付\n- 1Y 涨幅 -9.5% (Cotality) vs +6.4% (其他源) — 方向分歧，取保守值",
     "confidence": "medium"
   }
 ]
