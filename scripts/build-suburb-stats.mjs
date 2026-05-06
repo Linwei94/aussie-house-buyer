@@ -7,7 +7,9 @@
  *   - 每年一个 zip，里面是按 LGA 分的 .DAT 文件
  *   - 行级数据自 1990 起公开
  *
- * 输出：src/data/suburb-stats.json
+ * 输出三个文件（拆分降低单文件大小）：
+ *
+ * 1) src/data/suburb-stats.json — 按 suburb × propertyType 聚合
  *   {
  *     "Granville": {
  *       "STRATA": {
@@ -15,13 +17,41 @@
  *         "cagr":   { "1y": -0.034, "3y": 0.012, "5y": 0.041, "10y": 0.038 },
  *         "count":  { "1y": 187, "3y": 612, "5y": 1024, "10y": 2200 },
  *         "lastSold": [
- *           { "address": "14/35 Enid Ave", "price": 750000, "date": "2026-04-22" },
- *           ...
+ *           { "address": "14/35 Enid Ave", "price": 750000, "date": "2026-04-22" }
  *         ]
  *       },
  *       "RESIDENCE": { ... }
  *     }
  *   }
+ *
+ * 2) src/data/building-history.json — 按楼盘聚合（同街道号 + suburb 当成同楼）
+ *   {
+ *     "35 Enid Avenue, Granville": {
+ *       "unitCount": 19,
+ *       "sales": [
+ *         { "unit": "14", "price": 750000, "date": "2026-04-22" },
+ *         { "unit": "12", "price": 720000, "date": "2025-11-08" },
+ *         { "unit": "5",  "price": 545000, "date": "2017-06-21" }
+ *       ],
+ *       "medianBy": { "1y": 720000, "5y": 580000 },
+ *       "cagrBy":   { "5y": 0.045 }
+ *     }
+ *   }
+ *
+ * 3) src/data/property-history.json — 按具体单元 ID 聚合（仅多次成交的）
+ *   {
+ *     "14-35-enid-avenue-granville": {
+ *       "propertyId": 12345678,
+ *       "sales": [
+ *         { "price": 158000, "date": "1998-03-12" },
+ *         { "price": 385000, "date": "2007-08-22" },
+ *         { "price": 620000, "date": "2015-11-04" },
+ *         { "price": 750000, "date": "2026-04-22" }
+ *       ],
+ *       "ownCagr": 0.057
+ *     }
+ *   }
+ *   注：仅记录有 ≥2 次成交的单元（节省空间，单次成交无趋势可推）
  *
  * 使用：
  *   1. 运行 `node scripts/build-suburb-stats.mjs` 自动下载最近 10 年 PSI

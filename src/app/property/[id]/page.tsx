@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import Calculator from '@/components/Calculator'
+import SaleHistory from '@/components/SaleHistory'
 import {
   getAllProperties,
   getProperty,
@@ -160,6 +161,8 @@ export default function PropertyPage({
           )}
         </div>
       </div>
+
+      <SaleHistory property={property} />
 
       <Calculator initialInputs={initialInputs} />
     </main>
