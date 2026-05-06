@@ -432,14 +432,17 @@ export default function InputPanel({ inputs, onChange }: Props) {
                     min={0}
                     max={inputs.holdYears}
                     value={inputs.convertToInvestmentYear ?? ''}
-                    onChange={(e) =>
-                      update({
-                        convertToInvestmentYear:
-                          e.target.value === ''
-                            ? undefined
-                            : Number(e.target.value),
-                      })
-                    }
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      if (raw === '') {
+                        update({ convertToInvestmentYear: undefined })
+                        return
+                      }
+                      const n = Number(raw)
+                      if (Number.isFinite(n)) {
+                        update({ convertToInvestmentYear: n })
+                      }
+                    }}
                     className="text-sm"
                   />
                   <p className="text-[10px] text-muted-foreground">
@@ -449,7 +452,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">边际税率</Label>
-                  <div className="grid grid-cols-5 gap-1">
+                  <div className="grid grid-cols-3 gap-1 sm:grid-cols-5">
                     {[16, 30, 32, 37, 45].map((r) => (
                       <Button
                         key={r}

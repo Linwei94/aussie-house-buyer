@@ -468,12 +468,18 @@ export function calculateAll(inputs: Inputs): CalculationResult {
   const rentFrequency = inputs.rentFrequency ?? 'fortnightly'
   const periodsPerYear = rentFrequency === 'fortnightly' ? 26 : 12
 
-  // 转投资房参数
-  const convertYear =
+  // 转投资房参数（clamp 到 [0, holdYears] 防止 NaN/负数；undefined 则永远自住）
+  const NEVER_CONVERT = 999
+  const rawConvert =
     inputs.convertToInvestmentYear !== undefined &&
-    inputs.convertToInvestmentYear !== null
+    inputs.convertToInvestmentYear !== null &&
+    Number.isFinite(inputs.convertToInvestmentYear)
       ? inputs.convertToInvestmentYear
-      : 999 // 永远自住
+      : NEVER_CONVERT
+  const convertYear =
+    rawConvert >= NEVER_CONVERT
+      ? NEVER_CONVERT
+      : Math.max(0, Math.min(holdYears, rawConvert))
   const marginalTax = (inputs.marginalTaxRate ?? 32) / 100
   const annualDepreciation = inputs.annualDepreciation ?? 4000
   const propMgmtPct = (inputs.propMgmtPct ?? 7) / 100
@@ -657,8 +663,13 @@ export function calculateAll(inputs: Inputs): CalculationResult {
   const breakevenSalePrice =
     (rentPathAssets + remainingLoan - finalOffsetBalance + flatSellCosts) /
     (1 - commissionFraction)
+  // 防御性边界：holdYears = 0 时不能开 1/0 次方；卖价 ≤ 0 或与 price 比值非正会产生 NaN
+  const safeHoldYears = Math.max(holdYears, 1)
+  const ratio = breakevenSalePrice / price
   const requiredAnnualGrowth =
-    Math.pow(breakevenSalePrice / price, 1 / holdYears) - 1
+    ratio > 0 && Number.isFinite(ratio)
+      ? Math.pow(ratio, 1 / safeHoldYears) - 1
+      : 0
   const expectedSellCostsAtBE = totalSellingCosts(breakevenSalePrice, sellCosts)
 
   const breakeven: BreakevenResult = {
