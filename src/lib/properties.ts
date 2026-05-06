@@ -33,9 +33,11 @@ export interface PropertyRecord {
 }
 
 export function getAllProperties(): PropertyRecord[] {
-  return (propertiesJson as PropertyRecord[]).slice().sort((a, b) =>
-    (b.researchedAt ?? '').localeCompare(a.researchedAt ?? ''),
-  )
+  return (propertiesJson as unknown as PropertyRecord[])
+    .slice()
+    .sort((a, b) =>
+      (b.researchedAt ?? '').localeCompare(a.researchedAt ?? ''),
+    )
 }
 
 export function getProperty(id: string): PropertyRecord | undefined {
@@ -45,7 +47,7 @@ export function getProperty(id: string): PropertyRecord | undefined {
 /** Convert a researched PropertyRecord into calculator Inputs (partial override). */
 export function propertyToInputs(p: PropertyRecord): Partial<Inputs> {
   const cagr5y =
-    p.suburbApartmentGrowth5Y !== undefined
+    p.suburbApartmentGrowth5Y != null
       ? Math.pow(1 + p.suburbApartmentGrowth5Y / 100, 1 / 5) * 100 - 100
       : undefined
 
@@ -55,10 +57,10 @@ export function propertyToInputs(p: PropertyRecord): Partial<Inputs> {
     propertyData: {
       listingUrl: p.listingUrl,
       address: p.address,
-      rentPerWeek: p.weeklyRent,
-      strataPerQuarter: p.strataPerQuarter,
-      councilPerYear: p.councilPerYear,
-      waterPerYear: p.waterPerYear,
+      rentPerWeek: p.weeklyRent ?? undefined,
+      strataPerQuarter: p.strataPerQuarter ?? undefined,
+      councilPerYear: p.councilPerYear ?? undefined,
+      waterPerYear: p.waterPerYear ?? undefined,
       suburbAppreciation: cagr5y,
     },
   }

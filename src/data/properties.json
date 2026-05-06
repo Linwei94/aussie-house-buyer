@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "id": "granville-14-35-enid-avenue",
+    "address": "14/35 Enid Avenue, Granville NSW 2142",
+    "suburb": "Granville",
+    "state": "NSW",
+    "imageUrl": "",
+    "listingUrl": "https://www.domain.com.au/14-35-enid-avenue-granville-nsw-2142-2020782541",
+    "price": 750000,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "carSpaces": 1,
+    "propertyType": "apartment",
+    "weeklyRent": 720,
+    "weeklyRentRange": [680, 780],
+    "strataPerQuarter": 1095,
+    "councilPerYear": null,
+    "waterPerYear": null,
+    "suburbApartmentGrowth1Y": -9.5,
+    "suburbApartmentGrowth5Y": null,
+    "researchedAt": "2026-05-05",
+    "sources": [
+      "https://www.domain.com.au/14-35-enid-avenue-granville-nsw-2142-2020782541",
+      "https://www.yourinvestmentpropertymag.com.au/top-suburbs/nsw/2142-granville",
+      "https://www.htag.com.au/nsw/nsw314-city-of-parramatta-council/granville-nsw-2142/",
+      "https://www.propertyvalue.com.au/suburb/granville-2142-nsw"
+    ],
+    "notes": "3 房 + ensuite + stone benchtop + gas + 空调 + 车位 + 储物笼 + CBD 景观。125sqm 总 / 108sqm 内部。5 分钟走路到 Granville 火车站，35 分钟火车到 Sydney CBD。卖家 Soon Tee (LJ Hooker)。Granville 3BR unit 中位价 $677.5K（Domain Insight），本房 $750K 高 11%（合理：CBD 景观 + 面积大）。周租金估算 $720 基于 Granville 公寓 yield 6.12% + 3BR 房屋租 $740。Council/water 不在 listing 里，需 settle 前问 agent。1Y 涨幅 -9.5% (Cotality) vs +6.4% (其他) — 数据源分歧，请谨慎。",
+    "confidence": "medium"
+  }
+]

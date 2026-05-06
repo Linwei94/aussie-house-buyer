@@ -74,10 +74,10 @@ export default function PropertyPage({
             )}
           </div>
 
-          {(property.suburbApartmentGrowth1Y !== undefined ||
-            property.suburbApartmentGrowth5Y !== undefined) && (
+          {(property.suburbApartmentGrowth1Y != null ||
+            property.suburbApartmentGrowth5Y != null) && (
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
-              {property.suburbApartmentGrowth1Y !== undefined && (
+              {property.suburbApartmentGrowth1Y != null && (
                 <span>
                   {property.suburb} 公寓 1Y:{' '}
                   <strong className="text-slate-800">
@@ -86,7 +86,7 @@ export default function PropertyPage({
                   </strong>
                 </span>
               )}
-              {property.suburbApartmentGrowth5Y !== undefined && (
+              {property.suburbApartmentGrowth5Y != null && (
                 <span>
                   5Y 累计:{' '}
                   <strong className="text-slate-800">
