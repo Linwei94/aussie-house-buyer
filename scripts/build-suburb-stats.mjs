@@ -40,7 +40,10 @@ const YEARS_BACK = parseInt(process.env.YEARS_BACK ?? '10', 10)
 const CURRENT_YEAR = new Date().getFullYear()
 const START_YEAR = CURRENT_YEAR - YEARS_BACK + 1
 const MIN_PRICE = 50_000
-const MAX_PRICE = 500_000_000
+// 1995 后 NSW residential 单笔最贵成交 ~$100M（顶级豪宅）。常见 residential 上限 ~$10M。
+// 超过 $10M 几乎全是 commercial strata / 整楼 / 开发地块 — 过滤掉
+const MAX_PRICE_OVERALL = 100_000_000
+const MAX_PRICE_RESIDENTIAL = 10_000_000
 const USER_AGENT =
   'Mozilla/5.0 (compatible; AussieHomeBuyer/1.0; +https://github.com/linwei94/aussie-house-buyer)'
 
@@ -157,7 +160,7 @@ function parseDatLines(text, year, allSales) {
     const priceRaw = isOld ? cols[OLD_COL.PRICE] : cols[COL.PRICE]
 
     const price = parseInt(priceRaw?.replace(/,/g, '') ?? '', 10)
-    if (!price || price < MIN_PRICE || price > MAX_PRICE) continue
+    if (!price || price < MIN_PRICE || price > MAX_PRICE_OVERALL) continue
 
     const date = parseDate(dateRaw?.trim() ?? '')
     if (!date || date.getUTCFullYear() !== year) continue
@@ -177,6 +180,9 @@ function parseDatLines(text, year, allSales) {
     else if (nature === 'R') propertyType = 'RESIDENCE'
     else continue // skip vacant land / commercial / other
 
+    // Residential 价格上限过滤：超过 $10M 的几乎全是 commercial strata、整楼、地块
+    if (price > MAX_PRICE_RESIDENTIAL) continue
+
     const district = cols[COL.DISTRICT]?.trim() ?? ''
     const propId = (isOld ? cols[OLD_COL.PROPERTY_ID] : cols[COL.PROPERTY_ID])?.trim() ?? ''
     const unit = isOld ? '' : (cols[COL.UNIT_NUMBER]?.trim() ?? '')
@@ -184,6 +190,26 @@ function parseDatLines(text, year, allSales) {
     const street = (isOld ? cols[OLD_COL.STREET_NAME] : cols[COL.STREET_NAME])?.trim() ?? ''
 
     if (!district || !propId || !houseNum || !street) continue
+
+    // STRATA 必须有 unit number — 否则是整栋楼/commercial strata，不是公寓
+    if (propertyType === 'STRATA' && !unit) continue
+
+    // primary purpose 过滤（2001+ 格式才有）：仅保留 RESIDENCE / STRATA / TOWNHOUSE / FLAT
+    // "FACTORY"、"WAREHOUSE"、"OFFICE" 等商业用途排除
+    if (!isOld) {
+      const purpose = cols[COL.PURPOSE]?.trim().toUpperCase() ?? ''
+      // 允许的 residential 用途
+      const okPurpose =
+        !purpose ||
+        purpose.includes('RESID') ||
+        purpose.includes('STRATA') ||
+        purpose.includes('TOWNHOUSE') ||
+        purpose.includes('FLAT') ||
+        purpose.includes('UNIT') ||
+        purpose.includes('DUPLEX') ||
+        purpose.includes('HOUSE')
+      if (!okPurpose) continue
+    }
 
     allSales.push({
       district,

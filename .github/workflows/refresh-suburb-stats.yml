@@ -35,10 +35,11 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          if [[ -n "$(git status --porcelain src/data/suburb-stats.json)" ]]; then
-            git add src/data/suburb-stats.json
+          DATA_FILES="src/data/suburb-stats.json src/data/building-history.json src/data/property-history.json"
+          if [[ -n "$(git status --porcelain $DATA_FILES)" ]]; then
+            git add $DATA_FILES
             git commit -m "chore: refresh NSW suburb stats $(date -u +%Y-%m-%d)"
             git push origin main
           else
-            echo "No changes to suburb stats"
+            echo "No changes to NSW data files"
           fi
