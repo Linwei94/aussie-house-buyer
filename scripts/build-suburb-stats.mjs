@@ -175,12 +175,11 @@ function parseDatLines(text, year, allSales) {
       ?.trim()
       .toUpperCase() ?? ''
 
-    let propertyType
-    if (nature === '3') propertyType = 'STRATA'
-    else if (nature === 'R') propertyType = 'RESIDENCE'
-    else continue // skip vacant land / commercial / other
+    // Filter to residential 性质（R = 非 strata 住宅；3 = strata）
+    // NOTE: NSW VG 的 R/3 区分不可靠 — 很多 strata 公寓被标 R。所以下面用 unit 区分公寓 vs 房屋
+    if (nature !== 'R' && nature !== '3') continue
 
-    // Residential 价格上限过滤：超过 $10M 的几乎全是 commercial strata、整楼、地块
+    // Residential 价格上限过滤：超过 $10M 几乎全是 commercial strata、整栋楼、地块
     if (price > MAX_PRICE_RESIDENTIAL) continue
 
     const district = cols[COL.DISTRICT]?.trim() ?? ''
@@ -191,14 +190,13 @@ function parseDatLines(text, year, allSales) {
 
     if (!district || !propId || !houseNum || !street) continue
 
-    // STRATA 必须有 unit number — 否则是整栋楼/commercial strata，不是公寓
-    if (propertyType === 'STRATA' && !unit) continue
+    // 用 unit number 判断公寓 vs 房屋（比 nature code 更可靠）
+    // 有 unit 编号 = STRATA（公寓/单元），没有 = RESIDENCE（独立屋/联排）
+    const propertyType = unit ? 'STRATA' : 'RESIDENCE'
 
-    // primary purpose 过滤（2001+ 格式才有）：仅保留 RESIDENCE / STRATA / TOWNHOUSE / FLAT
-    // "FACTORY"、"WAREHOUSE"、"OFFICE" 等商业用途排除
+    // primary purpose 过滤（2001+ 格式才有）：仅保留 residential 用途
     if (!isOld) {
       const purpose = cols[COL.PURPOSE]?.trim().toUpperCase() ?? ''
-      // 允许的 residential 用途
       const okPurpose =
         !purpose ||
         purpose.includes('RESID') ||
