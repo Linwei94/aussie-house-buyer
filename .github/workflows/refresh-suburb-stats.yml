@@ -18,7 +18,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Cache PSI yearly zips (~10 × 100MB)
+        uses: actions/cache@v4
+        with:
+          path: .psi-cache
+          key: psi-cache-${{ github.run_id }}
+          restore-keys: psi-cache-
       - name: Build suburb stats
+        env:
+          YEARS_BACK: '10'
         run: node scripts/build-suburb-stats.mjs
       - name: Commit if changed
         run: |
